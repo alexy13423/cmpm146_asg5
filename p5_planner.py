@@ -21,6 +21,17 @@ all_recipes = []
 t_limit = 20
 Items = Crafting['Items']
 
+#make_checker:
+#Creates a function that takes the current state as an argument.
+#The function uses the given rule to determine whether or not the current state applies or not.
+#If all the items required by the rule are present within the state, the check function returns true. Otherwise, false.
+
+#Arguments: rule. This is one of the recipes from Crafting.json.
+#Returns: A function named check.
+
+#check:
+#Arguments: state. This is the current state.
+#Returns: True if the state contains the items required by the rule, false otherwise.
 def make_checker(rule):
 	if 'Requires' in rule:
 		requires = rule['Requires']
@@ -41,6 +52,17 @@ def make_checker(rule):
 	
 	return check
 
+#make_effector:
+#Creates a function that takes the current state as an argument.
+#The function uses the given rule to determine how it should modify the given state.
+#The state should be changed by subtracting whatever is consumed by the rule, and adding whatever is created.
+
+#Arguments: rule. This is one of the recipes from Crafting.json.
+#Returns: A function named effect.
+
+#effect:
+#Arguments: state. The current state.
+#Returns: A copy of the state (!) that has been modified by the rule given in make_effector.
 def make_effector(rule):
 	if 'Consumes' in rule:
 		consumes = rule['Consumes']
@@ -57,13 +79,29 @@ def make_effector(rule):
 		return state_copy
 	return effect
 
+#make_initial_state:
+#This basically creates a dictionary out of the given...dictionary?
+#This function is probably redundant, but using it just in case, since this was in the base code.
+
+#Arguments: inventory. This is an item from the Crafting dictionary. Used to make the initial_state
+#using Crafting['Initial'], and the goal_state, using Crafting['Goal'].
+#Returns: A dictionary of the given items for a current state. IE this state contains something like
+#four planks, one bench, etc.
 def make_initial_state(inventory):
 	state = {}
 	for i,name in enumerate(Items):
 		state[name] = inventory.get(name, 0)
 	return state
 
-initial_state = make_initial_state(Crafting['Initial'])	
+#The initial state of our machine is created here, using Crafting['Initial'].
+initial_state = make_initial_state(Crafting['Initial'])
+
+#make_goal_checker:
+#Makes a function that determines whether or not the current state fulfils the goal.
+
+#Arguments: goal. The dictionary for the goal, which is Crafting['Goal'] for Minecraft.
+#Returns: a function named is_goal, which compares the values in Crafting['Goal'] and the given state.
+#That function returns False if the goal conditions are not met, or true otherwise.
 def make_goal_checker(goal):
 	goal_state = make_initial_state(Crafting['Goal'])
 	def is_goal(state):
@@ -75,26 +113,54 @@ def make_goal_checker(goal):
 
 is_goal = make_goal_checker(Crafting['Goal'])
 
+#These two functions create representations of the current state, for the sake of hashing in dictionaries.
+#inventory_to_tuple is not used, if I recall, but inventory_to_set is.
+
+#inventory_to_set:
+#Arguments: d, a given dictionary.
+#Returns: A frozenset of the dictionary, allowing it to be used as a hash in another dictionary.
 def inventory_to_tuple(d):
 	return tuple(d.get(name,0) for i,name in enumerate(Items))
 
 def inventory_to_set(d):
 	return frozenset(d.items())
-	
+
+#heuristic:
+#This is the function that is supposed to determine the distance to the goal, as per the A* algorithm.
+#This function is probably where most of the remaining work needs to happen, although there is a possibility
+#that more work might need to be done elsewhere.
+
+#Arguments: state, the current state dictionary. You might want to add in the dictionary for the goal later on,
+#which can be accessed in Crafting['Goal']?
+#Returns: Currently, either 0 if the state is basically valid, or infinity if the inventory contains too many of one item (determined by the maximum of one item needed to make any other recipe.
+#You may want to proofread the recipes possibly just in case I made a mistake?
 def heuristic(state):
 	state_score = 0
+	#If the inventory contains more of an item than is needed to make a relevant recipe, return infinity so that ideally this state never gets pulled from the prioriy queue.
 	if state["bench"] > 1 or state["cart"] > 1 or state["coal"] > 1 or state["cobble"] > 8 or state["furnace"] > 1 or state["ingot"] > 6 or state["iron_axe"] > 1 or state["iron_pickaxe"] > 1 or state["ore"] > 1 or state["plank"] > 4 or state["stick"] > 4 or state["stone_axe"] > 1 or state["stone_pickaxe"] > 1 or state["wood"] > 1 or state["wooden_axe"] > 1 or state["wooden_pickaxe"] > 1:
 		state_score = float('inf')
 	return state_score
 
+#This constructs the rules needed for the graph. This was given.
 for name,rule in Crafting['Recipes'].items():
 	checker = make_checker(rule)
 	effector = make_effector(rule)
 	recipe = Recipe(name, checker, effector, rule['Time'])
 	all_recipes.append(recipe)
 
+#The actual search algorithm itself.
+#Arguments:
+#graph: the function used to determine the valid edges for the current state.
+#initial: The initial state.
+#is_goal: The goal function used to determine if the algorithm is complete.
+#limit: This is supposedly supposed to be used for the time limit, but it's not implemented yet.
+#heuristic: The heuristic function.
 def search(graph, initial, is_goal, limit, heuristic):
+	#A* setup.
 	frontier = Queue.PriorityQueue()
+	#Again, when hashing for a dictionary, you need to call inventory_to_set on the state, otherwise
+	#Python complains about a dictionary not being a hashable item (since it's mutuable?)
+	#Whereas a frozenset isn't.
 	initial_frozen = inventory_to_set(initial)
 	frontier.put((0, initial))
 	came_from = {}
@@ -103,15 +169,14 @@ def search(graph, initial, is_goal, limit, heuristic):
 	cost_so_far[initial_frozen] = 0
 	current = []
 	
-	#print("Initial state:")
-	#print(initial)
-	
+	#This holds the name of each rule that is used, so that you can construct the list of instructions later.
 	name_of = {}
 	name_of[initial_frozen] = None
 	
 	visited = {}
 	visited[initial_frozen] = True
 	
+	#This is pretty standard A*.
 	while not frontier.empty():
 		#print("New iteration state: ")
 		pri,current = frontier.get()
@@ -155,15 +220,17 @@ def search(graph, initial, is_goal, limit, heuristic):
 	
 	return total_cost, plan
 
+#graph:
+#Takes the current state, and returns every possible recipe to the search algorithm that can be used
+#based on the available materials in the current state (in theory).
 def graph(state):
 	for r in all_recipes:
 		if r.check(state):
 			yield (r.name, r.effect(state), r.cost)
 
+#This is basically the actual run of the program.
 total_cost,plan = search(graph, initial_state, is_goal, t_limit, heuristic)
 print ("Total cost: " + str(total_cost))
 for i in range(1, len(plan)):
 	print(plan[i])
-
-#print graph(t_initial)
 
