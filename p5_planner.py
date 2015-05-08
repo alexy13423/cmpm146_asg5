@@ -10,9 +10,9 @@ with open('Crafting.json') as f:
 	
 #print Crafting['Items']
 
-#print Crafting['Initial']
+print Crafting['Initial']
 
-#print Crafting['Goal']
+print Crafting['Goal']
 
 #print Crafting['Recipes'].items
 
@@ -105,9 +105,10 @@ initial_state = make_initial_state(Crafting['Initial'])
 def make_goal_checker(goal):
 	goal_state = make_initial_state(Crafting['Goal'])
 	def is_goal(state):
-		for i,name in enumerate(Items):
-			if goal_state.get(name, 0) > state.get(name, 0):
-				return False
+		if 'get' in state:
+			for i,name in enumerate(Items):
+				if goal_state.get(name, 0) > state.get(name, 0):
+					return False
 		return True
 	return is_goal
 
@@ -123,8 +124,10 @@ def inventory_to_tuple(d):
 	return tuple(d.get(name,0) for i,name in enumerate(Items))
 
 def inventory_to_set(d):
-	return frozenset(d.items())
-
+	if 'items' in d:
+		return frozenset(d.items())
+	return frozenset({})
+###
 #heuristic:
 #This is the function that is supposed to determine the distance to the goal, as per the A* algorithm.
 #This function is probably where most of the remaining work needs to happen, although there is a possibility
@@ -134,12 +137,39 @@ def inventory_to_set(d):
 #which can be accessed in Crafting['Goal']?
 #Returns: Currently, either 0 if the state is basically valid, or infinity if the inventory contains too many of one item (determined by the maximum of one item needed to make any other recipe.
 #You may want to proofread the recipes possibly just in case I made a mistake?
-def heuristic(state):
-	state_score = 0
-	#If the inventory contains more of an item than is needed to make a relevant recipe, return infinity so that ideally this state never gets pulled from the prioriy queue.
-	if state["bench"] > 1 or state["cart"] > 1 or state["coal"] > 1 or state["cobble"] > 8 or state["furnace"] > 1 or state["ingot"] > 6 or state["iron_axe"] > 1 or state["iron_pickaxe"] > 1 or state["ore"] > 1 or state["plank"] > 4 or state["stick"] > 4 or state["stone_axe"] > 1 or state["stone_pickaxe"] > 1 or state["wood"] > 1 or state["wooden_axe"] > 1 or state["wooden_pickaxe"] > 1:
-		state_score = float('inf')
-	return state_score
+goal = {}
+initial_state = []
+goal_state = []
+
+def heuristic(state, initial_state):
+	#state_score = 0
+   #Take the infinite if there are ever more items the necessary
+	 if state["bench"] > 1 or state["cart"] > 1 or state["furnace"] > 1 or state["iron_axe"] > 1 or state["iron_pickaxe"] > 1 or state["stone_axe"] > 1 or state["stone_pickaxe"] > 1 or state["wooden_axe"] > 1 or state["wooden_pickaxe"] > 1:
+          return sys.maxint
+
+
+	 if state["coal"] > 1 and state["coal"] > goal_state["coal"]:
+			 return sys.maxint
+   
+	 if state["cobble"] > 8 and state["cobble"] > goal_state["cobble"]:
+			 return sys.maxint
+   
+	 if state["ingot"] > 6 and state["ingot"] > goal_state["ingot"]:
+			 return sys.maxint
+   
+	 if state["ore"] > 1 and state["ore"] > goal_state["ore"]:
+			 return sys.maxint
+   
+	 if state["plank"] > 4 and state["plank"] > goal_state["plank"]:
+			 return sys.maxint
+   
+	 if state["stick"] > 4 and state["stick"] > goal_state["stick"]:
+			 return sys.maxint
+      
+	 if state["wood"] > 1 and state["wood"] > goal_state["wood"]:
+			 return sys.maxint
+      
+	 return 0
 
 #This constructs the rules needed for the graph. This was given.
 for name,rule in Crafting['Recipes'].items():
