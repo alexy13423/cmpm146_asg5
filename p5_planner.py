@@ -48,12 +48,13 @@ def make_effector(rule):
 		consumes = None
 	produces = rule['Produces']
 	def effect(state):
+		state_copy = state.copy()
 		if consumes != None:
 			for i,name in enumerate(consumes):
-				state[name] -= consumes[name]
+				state_copy[name] -= consumes[name]
 		for i,name in enumerate(produces):
-			state[name] += produces[name]
-		return state
+			state_copy[name] += produces[name]
+		return state_copy
 	return effect
 
 def make_initial_state(inventory):
@@ -83,7 +84,7 @@ def inventory_to_set(d):
 def heuristic(state):
 	state_score = 0
 	if state["bench"] > 1 or state["cart"] > 1 or state["coal"] > 1 or state["cobble"] > 8 or state["furnace"] > 1 or state["ingot"] > 6 or state["iron_axe"] > 1 or state["iron_pickaxe"] > 1 or state["ore"] > 1 or state["plank"] > 4 or state["stick"] > 4 or state["stone_axe"] > 1 or state["stone_pickaxe"] > 1 or state["wood"] > 1 or state["wooden_axe"] > 1 or state["wooden_pickaxe"] > 1:
-		state_score = float("inf")
+		state_score = float('inf')
 	return state_score
 
 for name,rule in Crafting['Recipes'].items():
@@ -95,47 +96,59 @@ for name,rule in Crafting['Recipes'].items():
 def search(graph, initial, is_goal, limit, heuristic):
 	frontier = Queue.PriorityQueue()
 	initial_frozen = inventory_to_set(initial)
-	frontier.put(initial, 0)
+	frontier.put((0, initial))
 	came_from = {}
 	cost_so_far = {}
 	came_from[initial_frozen] = None
 	cost_so_far[initial_frozen] = 0
 	current = []
 	
+	#print("Initial state:")
+	#print(initial)
+	
+	name_of = {}
+	name_of[initial_frozen] = None
+	
 	visited = {}
 	visited[initial_frozen] = True
 	
-	state_dict = initial
-	
 	while not frontier.empty():
-		current = frontier.get()
+		#print("New iteration state: ")
+		pri,current = frontier.get()
+		#print(current)
 		current_frozen = inventory_to_set(current)
-		print(current)
-		print ()
 		
 		if is_goal(current):
 			break
 		
 		for name,next_state,cost in graph(current):
+			#print ("State name: " + str(name))
+			#print ("Checking state: " + str(next_state))
 			new_cost = cost_so_far[current_frozen] + cost
 			next_frozen = inventory_to_set(next_state)
 			if next_frozen not in cost_so_far or new_cost < cost_so_far[next_frozen]:
 				visited[next_frozen] = True
 				cost_so_far[next_frozen] = new_cost
+				#print ("New cost: " + str(new_cost))
 				priority = new_cost + heuristic(next_state)
-				frontier.put(next_state, priority)
+				#print("Priority of next state: " + str(priority))
+				frontier.put((priority, next_state))
 				came_from[next_frozen] = current
+				#print (next_state)
+				#print ("Came from: ")
+				#print (current)
+				name_of[next_frozen] = name
 	
 	total_cost = cost_so_far[current_frozen]
 	
 	plan = []
 	this_state = current
-	print(came_from)
+	#print(came_from)
 	
 	while this_state != None:
 		#print(this_state)
-		plan.append(this_state)
 		this_state_frozen = inventory_to_set(this_state)
+		plan.append(name_of[this_state_frozen])
 		this_state = came_from[this_state_frozen]
 	
 	plan.reverse()
@@ -147,21 +160,10 @@ def graph(state):
 		if r.check(state):
 			yield (r.name, r.effect(state), r.cost)
 
-"""
-def t_graph(state):
-	for next_state, cost in edges[state].items():
-		yield ((state,next_state), next_state, cost)
-		
-def t_is_goal(state):
-	return state == 'cake'
-	
-def t_heuristic(state):
-	return 0
-"""
-
-
-
-print search(graph, initial_state, is_goal, t_limit, heuristic)
+total_cost,plan = search(graph, initial_state, is_goal, t_limit, heuristic)
+print ("Total cost: " + str(total_cost))
+for i in range(1, len(plan)):
+	print(plan[i])
 
 #print graph(t_initial)
 
