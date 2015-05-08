@@ -1,6 +1,8 @@
 import json
 from collections import namedtuple
 
+import sys
+
 import Queue
 import heapq
 from math import sqrt
@@ -10,9 +12,9 @@ with open('Crafting.json') as f:
 	
 #print Crafting['Items']
 
-print Crafting['Initial']
+#print Crafting['Initial']
 
-print Crafting['Goal']
+#print Crafting['Goal']
 
 #print Crafting['Recipes'].items
 
@@ -105,14 +107,14 @@ initial_state = make_initial_state(Crafting['Initial'])
 def make_goal_checker(goal):
 	goal_state = make_initial_state(Crafting['Goal'])
 	def is_goal(state):
-		if 'get' in state:
-			for i,name in enumerate(Items):
-				if goal_state.get(name, 0) > state.get(name, 0):
-					return False
+		for i,name in enumerate(Items):
+			#print("Item: " + str(name) + " Goal requirement: " + str(goal_state.get(name, 0)) + " State has: " + str(state.get(name, 0)))
+			if goal_state.get(name, 0) > state.get(name, 0):
+				return False
 		return True
 	return is_goal
 
-is_goal = make_goal_checker(Crafting['Goal'])
+goal_check = make_goal_checker(Crafting['Goal'])
 
 #These two functions create representations of the current state, for the sake of hashing in dictionaries.
 #inventory_to_tuple is not used, if I recall, but inventory_to_set is.
@@ -124,9 +126,7 @@ def inventory_to_tuple(d):
 	return tuple(d.get(name,0) for i,name in enumerate(Items))
 
 def inventory_to_set(d):
-	if 'items' in d:
-		return frozenset(d.items())
-	return frozenset({})
+	return frozenset(d.items())
 ###
 #heuristic:
 #This is the function that is supposed to determine the distance to the goal, as per the A* algorithm.
@@ -137,11 +137,11 @@ def inventory_to_set(d):
 #which can be accessed in Crafting['Goal']?
 #Returns: Currently, either 0 if the state is basically valid, or infinity if the inventory contains too many of one item (determined by the maximum of one item needed to make any other recipe.
 #You may want to proofread the recipes possibly just in case I made a mistake?
-goal = {}
-initial_state = []
-goal_state = []
+#goal = {}
+#initial_state = []
+goal_state = make_initial_state(Crafting['Goal'])
 
-def heuristic(state, initial_state):
+def heuristic(state):
 	#state_score = 0
    #Take the infinite if there are ever more items the necessary
 	 if state["bench"] > 1 or state["cart"] > 1 or state["furnace"] > 1 or state["iron_axe"] > 1 or state["iron_pickaxe"] > 1 or state["stone_axe"] > 1 or state["stone_pickaxe"] > 1 or state["wooden_axe"] > 1 or state["wooden_pickaxe"] > 1:
@@ -212,16 +212,22 @@ def search(graph, initial, is_goal, limit, heuristic):
 		pri,current = frontier.get()
 		#print(current)
 		current_frozen = inventory_to_set(current)
+		#print("Cost so far: ")
+		#print(cost_so_far)
 		
 		if is_goal(current):
+			#print("Cake!")
 			break
 		
 		for name,next_state,cost in graph(current):
 			#print ("State name: " + str(name))
 			#print ("Checking state: " + str(next_state))
 			new_cost = cost_so_far[current_frozen] + cost
+			#print ("New cost: " + str(new_cost))
 			next_frozen = inventory_to_set(next_state)
+			#print ("Old cost: " + str(cost_so_far.get(next_frozen, None)))
 			if next_frozen not in cost_so_far or new_cost < cost_so_far[next_frozen]:
+				#print("Adding!")
 				visited[next_frozen] = True
 				cost_so_far[next_frozen] = new_cost
 				#print ("New cost: " + str(new_cost))
@@ -259,7 +265,7 @@ def graph(state):
 			yield (r.name, r.effect(state), r.cost)
 
 #This is basically the actual run of the program.
-total_cost,plan = search(graph, initial_state, is_goal, t_limit, heuristic)
+total_cost,plan = search(graph, initial_state, goal_check, t_limit, heuristic)
 print ("Total cost: " + str(total_cost))
 for i in range(1, len(plan)):
 	print(plan[i])
